@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">SamsungRemote</string>
+    <string name="authorize_searching_message">Searching in Jumbo Network..</string>
+</resources>
