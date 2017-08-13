@@ -57,7 +57,7 @@ public class Authorize extends Fragment implements AdapterView.OnItemClickListen
         progressDialog.setMessage(getString(R.string.authorize_searching_message));
         progressDialog.setOnCancelListener(dialog -> {
             Toast.makeText(getActivity(), "Canceled", Toast.LENGTH_SHORT).show();
-            if (search.isSearching()) {
+            if (search != null && search.isSearching()) {
                 search.stop();
             }
         });
@@ -75,14 +75,16 @@ public class Authorize extends Fragment implements AdapterView.OnItemClickListen
      * Main search for devices method
      */
     private void startSearchForDevices() {
-        search.setOnServiceFoundListener(service -> {
-            devices.add(new Device(service.getName(), service.getId()));
-        });
-        search.setOnServiceLostListener(service -> {
-            removeFromListById(service.getId());
-        });
-        progressDialog.show();
-        //search.start();
+        if (search != null) {
+            search.setOnServiceFoundListener(service -> {
+                devices.add(new Device(service.getName(), service.getId()));
+            });
+            search.setOnServiceLostListener(service -> {
+                removeFromListById(service.getId());
+            });
+            progressDialog.show();
+            search.start();
+        }
     }
 
     /**
@@ -99,11 +101,13 @@ public class Authorize extends Fragment implements AdapterView.OnItemClickListen
     @Override
     public void onPause() {
         super.onPause();
-        search.stop();
         progressDialog.dismiss();
         lvDevices.setOnItemClickListener(null);
-        search.setOnServiceFoundListener(null);
-        search.setOnServiceLostListener(null);
+        if (search != null) {
+            search.stop();
+            search.setOnServiceFoundListener(null);
+            search.setOnServiceLostListener(null);
+        }
     }
 
     @Override
