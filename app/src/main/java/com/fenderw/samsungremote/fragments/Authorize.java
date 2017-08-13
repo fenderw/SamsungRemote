@@ -29,7 +29,7 @@ public class Authorize extends Fragment implements AdapterView.OnItemClickListen
     private ListView lvDevices;
     private ArrayAdapter<Device> adapter;
     private List<Device> devices;
-    private final Search search = Service.search(getActivity());
+    private Search search;
     private ProgressDialog progressDialog;
 
     /**
@@ -50,11 +50,13 @@ public class Authorize extends Fragment implements AdapterView.OnItemClickListen
         lvDevices = (ListView) v.findViewById(R.id.device_list);
         devices = new ArrayList<>();
         // temp
-        setDemoDevices();
+        //setDemoDevices();
         adapter = new ArrayAdapter<>(getActivity(), android.R.layout.simple_list_item_1, devices);
         lvDevices.setAdapter(adapter);
         progressDialog = new ProgressDialog(getActivity());
         progressDialog.setMessage(getString(R.string.authorize_searching_message));
+        if (search == null)
+            search = Service.search(getActivity());
         progressDialog.setOnCancelListener(dialog -> {
             Toast.makeText(getActivity(), "Canceled", Toast.LENGTH_SHORT).show();
             if (search != null && search.isSearching()) {
