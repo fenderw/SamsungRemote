@@ -17,6 +17,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Fragment authorizeFragment = new Authorize();
-        getSupportFragmentManager().beginTransaction().add(R.id.fragment_container, authorizeFragment, null).addToBackStack("Authorize").commit();
+        getSupportFragmentManager().beginTransaction().add(R.id.fragment_container, authorizeFragment, null).commit();
     }
 }

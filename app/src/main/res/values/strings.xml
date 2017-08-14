@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">SamsungRemote</string>
     <string name="authorize_searching_message">Searching in Jumbo Network..</string>
+    <string name="authorize_no_devices_found_message">No devices found.</string>
 </resources>
