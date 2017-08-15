@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -86,7 +87,9 @@ public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshL
         //setDemoDevices();
         adapter.notifyDataSetChanged();
         if (search != null) {
+            Toast.makeText(getActivity(), "search started", Toast.LENGTH_SHORT).show();
             search.setOnServiceFoundListener(service -> {
+                Toast.makeText(getActivity(), "Found " + service.getName(), Toast.LENGTH_SHORT).show();
                 devices.add(new Device(service.getName(), service.getId()));
                 adapter.notifyDataSetChanged();
             });
@@ -95,9 +98,20 @@ public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshL
             });
             progressDialog.show();
             search.start();
-            // set the handler to stop the search in 10 seconds
-            mHandler.postDelayed(() -> cleanUpSearch(), 10000);
+            // TODO set the handler to stop the search in 10 seconds
+            //mHandler.postDelayed(() -> cleanUpSearch(), 10000);
+            mHandler.postDelayed(() -> checkIfSearching(), 5000);
         }
+    }
+
+    /**
+     * Just a debug method
+     */
+    private void checkIfSearching() {
+        if (search.isSearching()) {
+            Toast.makeText(getActivity(), "is searching..", Toast.LENGTH_SHORT).show();
+        } else
+            Toast.makeText(getActivity(), "is not searching", Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -126,6 +140,7 @@ public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshL
     private void cleanUpSearch() {
         mHandler.removeCallbacksAndMessages(null);
         if (search != null) {
+            Toast.makeText(getActivity(), "Listeners cleaned up!", Toast.LENGTH_SHORT).show();
             search.stop();
             search.setOnServiceFoundListener(null);
             search.setOnServiceLostListener(null);
@@ -155,9 +170,21 @@ public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshL
         swipeRefreshLayout.setOnRefreshListener(null);
     }
 
+    /**
+     * Switch to the remote control fragment
+     */
+    private void nextFragment() {
+        Fragment fragment = new RemoteControl();
+        String fragmentTag = "remote";
+        FragmentTransaction ft = getFragmentManager().beginTransaction();
+        ft.setCustomAnimations(R.anim.enter_from_right, R.anim.exit_to_left, R.anim.enter_from_left, R.anim.exit_to_right);
+        ft.replace(R.id.fragment_container, fragment, fragmentTag).addToBackStack(fragmentTag).commit();
+    }
+
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
         Toast.makeText(getActivity(), "Id : " + devices.get(position).getId(), Toast.LENGTH_SHORT).show();
+        nextFragment();
     }
 
     @Override
