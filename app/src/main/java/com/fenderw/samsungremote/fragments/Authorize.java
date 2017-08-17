@@ -7,6 +7,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.widget.SwipeRefreshLayout;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,6 +16,13 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.connectsdk.device.ConnectableDevice;
+import com.connectsdk.device.ConnectableDeviceListener;
+import com.connectsdk.discovery.DiscoveryManager;
+import com.connectsdk.discovery.DiscoveryManagerListener;
+import com.connectsdk.service.DeviceService;
+import com.connectsdk.service.command.ServiceCommandError;
+import com.fenderw.samsungremote.Additional.MyConnectableDevice;
 import com.fenderw.samsungremote.R;
 import com.fenderw.samsungremote.objects.Device;
 import com.samsung.multiscreen.Search;
@@ -30,26 +38,29 @@ import java.util.List;
 public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshListener, AdapterView.OnItemClickListener {
 
     private final String TAG = getClass().getSimpleName();
+    private final int SEARCH_TIME_OUT = 60 * 1000; // 1 minute
 
     private SwipeRefreshLayout swipeRefreshLayout;
     private ListView lvDevices;
-    private ArrayAdapter<Device> adapter;
-    private List<Device> devices;
-    private Search search;
+    private ArrayAdapter<MyConnectableDevice> adapter;
+    private List<MyConnectableDevice> devices;
+    //private Search search;
     private ProgressDialog progressDialog;
     // handler to handle the search timeout
     private Handler mHandler;
+    //
+    MyConnectableDevice mTV;
 
     /**
      * Temporary method for test purposes
      */
-    private void setDemoDevices() {
+    /*private void setDemoDevices() {
         if (devices != null) {
             devices.add(new Device("device1", "id1"));
             devices.add(new Device("device2", "id2"));
             devices.add(new Device("device3", "id3"));
         }
-    }
+    }*/
 
     @Nullable
     @Override
@@ -64,8 +75,10 @@ public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshL
         // progress dialog setup
         progressDialog = new ProgressDialog(getActivity());
         progressDialog.setMessage(getString(R.string.authorize_searching_message));
-        if (search == null)
-            search = Service.search(getActivity());
+        //
+        DiscoveryManager.getInstance().registerDefaultDeviceTypes();
+        DiscoveryManager.getInstance().setPairingLevel(DiscoveryManager.PairingLevel.ON);
+        //
         progressDialog.setOnCancelListener(dialog -> cleanUpSearch());
         swipeRefreshLayout.setOnRefreshListener(this);
         return swipeRefreshLayout;
@@ -86,46 +99,38 @@ public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshL
         // temp
         //setDemoDevices();
         adapter.notifyDataSetChanged();
-        if (search != null) {
-            Toast.makeText(getActivity(), "search started", Toast.LENGTH_SHORT).show();
-            search.setOnServiceFoundListener(service -> {
-                Toast.makeText(getActivity(), "Found " + service.getName(), Toast.LENGTH_SHORT).show();
-                devices.add(new Device(service.getName(), service.getId()));
-                adapter.notifyDataSetChanged();
-            });
-            search.setOnServiceLostListener(service -> {
-                removeFromListById(service.getId());
-            });
-            progressDialog.show();
-            search.start();
-            // TODO set the handler to stop the search in 10 seconds
-            //mHandler.postDelayed(() -> cleanUpSearch(), 10000);
-            mHandler.postDelayed(() -> checkIfSearching(), 5000);
-        }
+        Toast.makeText(getActivity(), "search started", Toast.LENGTH_SHORT).show();
+        DiscoveryManager.getInstance().addListener(discoveryManagerListener);
+        progressDialog.show();
+        DiscoveryManager.getInstance().start();
+
+        // set the handler to stop the search in SEARCH_TIME_OUT
+        mHandler.postDelayed(() -> cleanUpSearch(), SEARCH_TIME_OUT);
+
     }
 
     /**
      * Just a debug method
      */
-    private void checkIfSearching() {
+    /*private void checkIfSearching() {
         if (search.isSearching()) {
             Toast.makeText(getActivity(), "is searching..", Toast.LENGTH_SHORT).show();
         } else
             Toast.makeText(getActivity(), "is not searching", Toast.LENGTH_SHORT).show();
-    }
+    }*/
 
     /**
      * Remove device from the list by its id
      *
      * @param id
      */
-    private void removeFromListById(String id) {
+    /*private void removeFromListById(String id) {
         for (Device device : devices)
             if (device.getId().equals(id)) {
                 devices.remove(device);
                 adapter.notifyDataSetChanged();
             }
-    }
+    }*/
 
     @Override
     public void onPause() {
@@ -139,12 +144,9 @@ public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshL
      */
     private void cleanUpSearch() {
         mHandler.removeCallbacksAndMessages(null);
-        if (search != null) {
-            Toast.makeText(getActivity(), "Listeners cleaned up!", Toast.LENGTH_SHORT).show();
-            search.stop();
-            search.setOnServiceFoundListener(null);
-            search.setOnServiceLostListener(null);
-        }
+        Toast.makeText(getActivity(), "Listeners cleaned up!", Toast.LENGTH_SHORT).show();
+        DiscoveryManager.getInstance().removeListener(discoveryManagerListener);
+        DiscoveryManager.getInstance().stop();
         if (progressDialog.isShowing()) {
             progressDialog.dismiss();
         }
@@ -166,7 +168,6 @@ public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshL
     @Override
     public void onDestroy() {
         super.onDestroy();
-        search = null;
         swipeRefreshLayout.setOnRefreshListener(null);
     }
 
@@ -192,4 +193,90 @@ public class Authorize extends Fragment implements SwipeRefreshLayout.OnRefreshL
         swipeRefreshLayout.setRefreshing(false);
         startSearchForDevices();
     }
+
+    private DiscoveryManagerListener discoveryManagerListener = new DiscoveryManagerListener() {
+        @Override
+        public void onDeviceAdded(DiscoveryManager manager, ConnectableDevice device) {
+            Toast.makeText(getActivity(), "Found " + device.getFriendlyName(), Toast.LENGTH_SHORT).show();
+            devices.add((MyConnectableDevice) device);
+            adapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onDeviceUpdated(DiscoveryManager manager, ConnectableDevice device) {
+
+        }
+
+        @Override
+        public void onDeviceRemoved(DiscoveryManager manager, ConnectableDevice device) {
+            devices.remove(device);
+            adapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onDiscoveryFailed(DiscoveryManager manager, ServiceCommandError error) {
+
+        }
+    };
+
+    private ConnectableDeviceListener deviceListener = new ConnectableDeviceListener() {
+
+        @Override
+        public void onPairingRequired(ConnectableDevice device, DeviceService service, DeviceService.PairingType pairingType) {
+            Log.d("2ndScreenAPP", "Connected to " + mTV.getIpAddress());
+
+            switch (pairingType) {
+                case FIRST_SCREEN:
+                    Log.d("2ndScreenAPP", "First Screen");
+                    //pairingAlertDialog.show();
+                    break;
+
+                case PIN_CODE:
+                case MIXED:
+                    Log.d("2ndScreenAPP", "Pin Code");
+                    //pairingCodeDialog.show();
+                    break;
+
+                case NONE:
+                default:
+                    break;
+            }
+        }
+
+        @Override
+        public void onConnectionFailed(ConnectableDevice device, ServiceCommandError error) {
+            Log.d("2ndScreenAPP", "onConnectFailed");
+            //connectFailed(mTV);
+        }
+
+        @Override
+        public void onDeviceReady(ConnectableDevice device) {
+            Log.d("2ndScreenAPP", "onPairingSuccess");
+            /*if (pairingAlertDialog.isShowing()) {
+                pairingAlertDialog.dismiss();
+            }
+            if (pairingCodeDialog.isShowing()) {
+                pairingCodeDialog.dismiss();
+            }
+            registerSuccess(mTV);*/
+        }
+
+        @Override
+        public void onDeviceDisconnected(ConnectableDevice device) {
+            Log.d("2ndScreenAPP", "Device Disconnected");
+            /*connectEnded(mTV);
+            connectItem.setTitle("Connect");
+
+            BaseFragment frag = mSectionsPagerAdapter.getFragment(mViewPager.getCurrentItem());
+            if (frag != null) {
+                Toast.makeText(getApplicationContext(), "Device Disconnected", Toast.LENGTH_SHORT).show();
+                frag.disableButtons();
+            }*/
+        }
+
+        @Override
+        public void onCapabilityUpdated(ConnectableDevice device, List<String> added, List<String> removed) {
+
+        }
+    };
 }
